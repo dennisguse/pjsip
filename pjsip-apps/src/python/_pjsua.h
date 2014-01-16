@@ -25,6 +25,7 @@
 #include <Python.h>
 #include <structmember.h>
 #include <pjsua-lib/pjsua.h>
+#include <X11/Xlib.h>
 
 
 PJ_INLINE(pj_str_t) PyString_ToPJ(const PyObject *obj)
@@ -1742,6 +1743,10 @@ typedef struct
     unsigned	     use_srtp;
     unsigned	     srtp_secure_signaling;
     PyObject	    *rtp_transport_cfg;
+    int	             vid_out_auto_transmit;
+    int	             vid_in_auto_show;
+    int              video_capture_device;
+    int              video_render_device;
 } PyObj_pjsua_acc_config;
 
 
@@ -1825,6 +1830,11 @@ static void PyObj_pjsua_acc_config_import(PyObj_pjsua_acc_config *obj,
     obj->use_srtp = cfg->use_srtp;
     obj->srtp_secure_signaling = cfg->srtp_secure_signaling;
 
+    obj->vid_out_auto_transmit = cfg->vid_out_auto_transmit;
+    obj->vid_in_auto_show = cfg->vid_in_auto_show;
+    obj->video_capture_device = cfg->vid_cap_dev;
+    obj->video_render_device = cfg->vid_rend_dev;
+
     Py_XDECREF(obj->rtp_transport_cfg);
     tconf = (PyObj_pjsua_transport_config*)
 	    PyObj_pjsua_transport_config_new(&PyTyp_pjsua_transport_config,
@@ -1882,6 +1892,10 @@ static void PyObj_pjsua_acc_config_export(pjsua_acc_config *cfg,
     cfg->ka_data = PyString_ToPJ(obj->ka_data);
     cfg->use_srtp = obj->use_srtp;
     cfg->srtp_secure_signaling = obj->srtp_secure_signaling;
+    cfg->vid_in_auto_show = obj->vid_in_auto_show;
+    cfg->vid_out_auto_transmit = obj->vid_out_auto_transmit;
+    cfg->vid_cap_dev = obj->video_capture_device;
+    cfg->vid_rend_dev = obj->video_render_device;
 
     tconf = (PyObj_pjsua_transport_config*)obj->rtp_transport_cfg;
     PyObj_pjsua_transport_config_export(&cfg->rtp_cfg, tconf);
@@ -2081,6 +2095,26 @@ static PyMemberDef PyObj_pjsua_acc_config_members[] =
 	"rtp_transport_cfg", T_OBJECT_EX,
 	offsetof(PyObj_pjsua_acc_config, rtp_transport_cfg), 0,
 	"Transport configuration for RTP."
+    },
+    {
+        "vid_out_auto_transmit", T_INT, 
+        offsetof(PyObj_pjsua_acc_config, vid_out_auto_transmit), 0,
+        "Specify whether outgoing video should be activated by default when making outgoing calls and/or when incoming video is detected. This applies to incoming and outgoing calls, incoming re-INVITE, and incoming UPDATE. If the setting is non-zero, outgoing video transmission will be started as soon as response to these requests is sent (or received)."
+    },
+    {
+        "vid_in_auto_show", T_INT, 
+        offsetof(PyObj_pjsua_acc_config, vid_in_auto_show), 0,
+        "Specify whether incoming video should be shown to screen by default. This applies to incoming call (INVITE), incoming re-INVITE, and incoming UPDATE requests."
+    },
+    {
+        "video_capture_device", T_INT, 
+        offsetof(PyObj_pjsua_acc_config, video_capture_device), 0,
+        "The default video capture device"
+    },
+    {
+        "video_render_device", T_INT, 
+        offsetof(PyObj_pjsua_acc_config, video_render_device), 0,
+        "The default video render device"
     },
 
     {NULL}  /* Sentinel */
@@ -2919,6 +2953,7 @@ typedef struct
         
     unsigned  input_count;
     unsigned  output_count;
+    unsigned  device_id;
     unsigned  default_samples_per_sec;    
     PyObject *name;
 
@@ -2968,6 +3003,11 @@ static PyMemberDef pjmedia_snd_dev_info_members[] =
         "output_count", T_INT, 
         offsetof(PyObj_pjmedia_snd_dev_info, output_count), 0,
         "Max number of output channels"
+    },
+    {
+        "device_id", T_INT, 
+        offsetof(PyObj_pjmedia_snd_dev_info, device_id), 0,
+        "The id of the audio device"
     },
     {
         "default_samples_per_sec", T_INT, 
@@ -3028,6 +3068,1127 @@ static PyTypeObject PyTyp_pjmedia_snd_dev_info =
     0,                              /* tp_init */
     0,                              /* tp_alloc */
     pjmedia_snd_dev_info_new,       /* tp_new */
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+ * PyObj_pjmedia_vid_dev_info
+ * attribute list for video device info
+ */
+typedef struct
+{
+    PyObject_HEAD
+    /* Type-specific fields go here. */ 
+        
+   /*
+
+	pjmedia_dir 	dir
+	pjmedia_format 	fmt [PJMEDIA_VID_DEV_INFO_FMT_CNT]
+*/
+
+    pj_int32_t id;
+    PyObject *name;
+    PyObject *driver;
+    int dir;
+    pj_bool_t has_callback;
+    unsigned  caps; 
+    unsigned fmt_cnt;
+    //PyObject *fmt;
+
+} PyObj_pjmedia_vid_dev_info;
+
+/*
+ * pjmedia_vid_dev_info_dealloc
+ * deletes a pjmedia_vid_dev_info from memory
+ */
+static void pjmedia_vid_dev_info_dealloc(PyObj_pjmedia_vid_dev_info* self)
+{
+    Py_XDECREF(self->name);  
+    Py_XDECREF(self->driver);       
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+/*
+ * pjmedia_vid_dev_info_new
+ * constructor for pjmedia_vid_dev_info object
+ */
+static PyObject * pjmedia_vid_dev_info_new(PyTypeObject *type, 
+					   PyObject *args,
+					   PyObject *kwds)
+{
+    PyObj_pjmedia_vid_dev_info *self;
+    
+    PJ_UNUSED_ARG(args);
+    PJ_UNUSED_ARG(kwds);
+    self = (PyObj_pjmedia_vid_dev_info *)type->tp_alloc(type, 0);
+    if (self != NULL) {
+        self->name = PyString_FromString("");	
+        self->driver = PyString_FromString("");
+    }
+    return (PyObject *)self;
+}
+
+/*
+ * pjmedia_vid_dev_info_members
+ */
+static PyMemberDef pjmedia_vid_dev_info_members[] =
+{
+    {
+        "id", T_INT, 
+        offsetof(PyObj_pjmedia_vid_dev_info, id), 0,
+        "The device ID"
+    },
+    {
+        "name", T_OBJECT_EX,
+        offsetof(PyObj_pjmedia_vid_dev_info, name), 0,
+        "Device name"        
+    },
+    {
+        "driver", T_OBJECT_EX,
+        offsetof(PyObj_pjmedia_vid_dev_info, driver), 0,
+        "The underlying driver name"        
+    },
+    {
+        "caps", T_INT, 
+        offsetof(PyObj_pjmedia_vid_dev_info, caps), 0,
+        "Device capabilities, as bitmask combination of pjmedia_vid_dev_cap"
+    },
+    {
+        "fmt_cnt", T_INT, 
+        offsetof(PyObj_pjmedia_vid_dev_info, fmt_cnt), 0,
+        "Number of video formats supported by this device"
+    },
+    {
+        "has_callback", T_INT, 
+        offsetof(PyObj_pjmedia_vid_dev_info, has_callback), 0,
+        "Specify whether the device supports callback."
+    },
+    {
+        "media_dir", T_INT, 
+        offsetof(PyObj_pjmedia_vid_dev_info, dir), 0,
+        "Media direction"
+    },
+        
+    {NULL}  /* Sentinel */
+};
+
+
+/*
+ * PyTyp_pjmedia_vid_dev_info
+ */
+static PyTypeObject PyTyp_pjmedia_vid_dev_info =
+{
+    PyObject_HEAD_INIT(NULL)
+    0,                              /*ob_size*/
+    "_pjsua.PJMedia_Vid_Dev_Info",  /*tp_name*/
+    sizeof(PyObj_pjmedia_vid_dev_info),  /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor)pjmedia_vid_dev_info_dealloc,/*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,                              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    "PJMedia Vid Dev Info object",  /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    pjmedia_vid_dev_info_members,   /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+    0,                              /* tp_alloc */
+    pjmedia_vid_dev_info_new,       /* tp_new */
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+ * PyObj_pjmedia_vid_win_info
+ * attribute list for video device info
+ */
+typedef struct
+{
+    PyObject_HEAD
+    /* Type-specific fields go here. */ 
+    pj_bool_t is_native;
+    pj_bool_t show;
+    unsigned size_w;
+    unsigned size_h;
+    unsigned coord_x;
+    unsigned coord_y;
+    pjmedia_vid_dev_index rdr_dev;
+    Window win; 	
+
+} PyObj_pjmedia_vid_win_info;
+
+/*
+ * pjmedia_vid_win_info_dealloc
+ * deletes a pjmedia_vid_win_info from memory
+ */
+static void pjmedia_vid_win_info_dealloc(PyObj_pjmedia_vid_dev_info* self)
+{      
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+/*
+ * pjmedia_vid_win_info_new
+ * constructor for pjmedia_vid_win_info object
+ */
+static PyObject * pjmedia_vid_win_info_new(PyTypeObject *type, 
+					   PyObject *args,
+					   PyObject *kwds)
+{
+    PyObj_pjmedia_vid_win_info *self;
+    
+    PJ_UNUSED_ARG(args);
+    PJ_UNUSED_ARG(kwds);
+    self = (PyObj_pjmedia_vid_win_info *)type->tp_alloc(type, 0);
+    return (PyObject *)self;
+}
+
+/*
+ * pjmedia_vid_win_info_members
+ */
+static PyMemberDef pjmedia_vid_win_info_members[] =
+{
+    {
+        "is_native", T_INT, 
+        offsetof(PyObj_pjmedia_vid_win_info, is_native), 0,
+        "Flag to indicate whether this window is a native window, such as created by built-in preview device. If this field is PJ_TRUE, only the native window handle field of this structure is valid. "
+    },
+    {
+        "show", T_INT, 
+        offsetof(PyObj_pjmedia_vid_win_info, show), 0,
+        "Window show status. The window is hidden if false."
+    },
+    {
+        "size_w", T_INT, 
+        offsetof(PyObj_pjmedia_vid_win_info, size_w), 0,
+        "The width."
+    },
+    {
+        "size_h", T_INT, 
+        offsetof(PyObj_pjmedia_vid_win_info, size_h), 0,
+        "The height."
+    },
+    {
+        "coord_x", T_INT, 
+        offsetof(PyObj_pjmedia_vid_win_info, coord_x), 0,
+        "X position of the coordinate"
+    },
+    {
+        "coord_y", T_INT, 
+        offsetof(PyObj_pjmedia_vid_win_info, coord_y), 0,
+        "Y position of the coordinate"
+    },
+    {
+        "rdr_dev", T_INT, 
+        offsetof(PyObj_pjmedia_vid_win_info, rdr_dev), 0,
+        "Renderer device ID."
+    },
+    {
+        "win", T_INT, 
+        offsetof(PyObj_pjmedia_vid_win_info, win), 0,
+        "The Window."
+    },
+        
+    {NULL}  /* Sentinel */
+};
+
+
+/*
+ * PyTyp_pjmedia_vid_win_info
+ */
+static PyTypeObject PyTyp_pjmedia_vid_win_info =
+{
+    PyObject_HEAD_INIT(NULL)
+    0,                              /*ob_size*/
+    "_pjsua.PJMedia_Vid_Win_Info",  /*tp_name*/
+    sizeof(PyObj_pjmedia_vid_win_info),  /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor)pjmedia_vid_win_info_dealloc,/*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,                              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    "PJMedia Vid Window Info object",  /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    pjmedia_vid_win_info_members,   /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+    0,                              /* tp_alloc */
+    pjmedia_vid_win_info_new,       /* tp_new */
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+ * PyObj_pjmedia_rect_size
+ * attribute list for media rect size
+ */
+typedef struct
+{
+    PyObject_HEAD
+    /* Type-specific fields go here. */ 
+    unsigned w;
+    unsigned h;
+
+} PyObj_pjmedia_rect_size;
+
+/*
+ * pjmedia_rect_size_dealloc
+ * deletes a pjmedia_rect_size from memory
+ */
+static void pjmedia_rect_size_dealloc(PyObj_pjmedia_rect_size* self)
+{      
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+/*
+ * pjmedia_rect_size_new
+ * constructor for pjmedia_rect_size object
+ */
+static PyObject * pjmedia_rect_size_new(PyTypeObject *type, 
+			             PyObject *args,
+				     PyObject *kwds)
+{
+    PyObj_pjmedia_rect_size *self;
+    
+    PJ_UNUSED_ARG(args);
+    PJ_UNUSED_ARG(kwds);
+    self = (PyObj_pjmedia_rect_size *)type->tp_alloc(type, 0);
+    return (PyObject *)self;
+}
+
+/*
+ * pjmedia_rect_size_members
+ */
+static PyMemberDef pjmedia_rect_size_members[] =
+{
+    {
+        "w", T_INT, 
+        offsetof(PyObj_pjmedia_rect_size, w), 0,
+        "The width."
+    },
+    {
+        "h", T_INT, 
+        offsetof(PyObj_pjmedia_rect_size, h), 0,
+        "The height."
+    },
+        
+    {NULL}  /* Sentinel */
+};
+
+
+/*
+ * PyTyp_pjmedia_rect_size
+ */
+static PyTypeObject PyTyp_pjmedia_rect_size=
+{
+    PyObject_HEAD_INIT(NULL)
+    0,                              /*ob_size*/
+    "_pjsua.PJMedia_Rect_Size",  /*tp_name*/
+    sizeof(PyObj_pjmedia_rect_size),  /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor)pjmedia_rect_size_dealloc,/*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,                              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    "PJMedia Rect Size object",  /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    pjmedia_rect_size_members,   /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+    0,                              /* tp_alloc */
+    pjmedia_rect_size_new,       /* tp_new */
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+ * PyObj_pjmedia_ratio
+ * attribute list for media ratio
+ */
+typedef struct
+{
+    PyObject_HEAD
+    /* Type-specific fields go here. */ 
+    int num;
+    int denum;
+
+} PyObj_pjmedia_ratio;
+
+/*
+ * pjmedia_ratio_dealloc
+ * deletes a pjmedia_ratio from memory
+ */
+static void pjmedia_ratio_dealloc(PyObj_pjmedia_ratio* self)
+{      
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+/*
+ * pjmedia_ratio_new
+ * constructor for pjmedia_ratio object
+ */
+static PyObject * pjmedia_ratio_new(PyTypeObject *type, 
+			            PyObject *args,
+				    PyObject *kwds)
+{
+    PyObj_pjmedia_ratio *self;
+    
+    PJ_UNUSED_ARG(args);
+    PJ_UNUSED_ARG(kwds);
+    self = (PyObj_pjmedia_ratio *)type->tp_alloc(type, 0);
+    return (PyObject *)self;
+}
+
+/*
+ * pjmedia_ratio_members
+ */
+static PyMemberDef pjmedia_ratio_members[] =
+{
+    {
+        "num", T_INT, 
+        offsetof(PyObj_pjmedia_ratio, num), 0,
+        "num"
+    },
+    {
+        "denum", T_INT, 
+        offsetof(PyObj_pjmedia_ratio, denum), 0,
+        "< Numerator. "
+    },
+        
+    {NULL}  /* Sentinel */
+};
+
+
+/*
+ * PyTyp_pjmedia_ratio
+ */
+static PyTypeObject PyTyp_pjmedia_ratio=
+{
+    PyObject_HEAD_INIT(NULL)
+    0,                              /*ob_size*/
+    "_pjsua.PJMedia_Ratio",  /*tp_name*/
+    sizeof(PyObj_pjmedia_ratio),  /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor)pjmedia_ratio_dealloc,/*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,                              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    "PJMedia Ratio object",  /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    pjmedia_ratio_members,   /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+    0,                              /* tp_alloc */
+    pjmedia_ratio_new,       /* tp_new */
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+ * PyObj_pjmedia_video_format_detail
+ * attribute list for media video format detail
+ */
+typedef struct
+{
+    PyObject_HEAD
+    /* Type-specific fields go here. */ 
+    PyObj_pjmedia_rect_size *size;
+    PyObj_pjmedia_ratio *fps;
+    pj_uint32_t avg_bps;
+    pj_uint32_t max_bps;
+
+} PyObj_pjmedia_video_format_detail;
+
+/*
+ * pjmedia_video_format_detail_dealloc
+ * deletes a pjmedia_video_format_detail from memory
+ */
+static void pjmedia_video_format_detail_dealloc(PyObj_pjmedia_video_format_detail* self)
+{      
+    Py_XDECREF(self->fps); 
+    Py_XDECREF(self->size);
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+/*
+ * pjmedia_video_format_detail_new
+ * constructor for pjmedia_video_format_detail object
+ */
+static PyObject * pjmedia_video_format_detail_new(PyTypeObject *type, 
+			             PyObject *args,
+				     PyObject *kwds)
+{
+    PyObj_pjmedia_video_format_detail *self;
+    
+    PJ_UNUSED_ARG(args);
+    PJ_UNUSED_ARG(kwds);
+    self = (PyObj_pjmedia_video_format_detail *)type->tp_alloc(type, 0);
+    if (self != NULL) {
+        self->fps = (PyObj_pjmedia_ratio *)
+		     PyType_GenericNew(&PyTyp_pjmedia_ratio, 
+				       NULL, NULL);
+        self->size = (PyObj_pjmedia_rect_size *)
+		      PyType_GenericNew(&PyTyp_pjmedia_rect_size, 
+				       NULL, NULL);
+    }
+    return (PyObject *)self;
+}
+
+/*
+ * pjmedia_video_format_detail_members
+ */
+static PyMemberDef pjmedia_video_format_detail_members[] =
+{
+    {
+        "size", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_video_format_detail, size), 0,
+        "Video size (width, height)."
+    },
+    {
+        "fps", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_video_format_detail, fps), 0,
+        "Number of frames per second."
+    },
+    {
+        "avg_bps", T_INT, 
+        offsetof(PyObj_pjmedia_video_format_detail, avg_bps), 0,
+        "Average bitrate."
+    },
+    {
+        "max_bps", T_INT, 
+        offsetof(PyObj_pjmedia_video_format_detail, max_bps), 0,
+        "Maximum bitrate."
+    },
+        
+    {NULL}  /* Sentinel */
+};
+
+
+/*
+ * PyTyp_pjmedia_video_format_detail
+ */
+static PyTypeObject PyTyp_pjmedia_video_format_detail=
+{
+    PyObject_HEAD_INIT(NULL)
+    0,                              /*ob_size*/
+    "_pjsua.PJMedia_Video_Format_Detail",  /*tp_name*/
+    sizeof(PyObj_pjmedia_video_format_detail),  /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor)pjmedia_video_format_detail_dealloc,/*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,                              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    "PJMedia Video Format Detail object",  /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    pjmedia_video_format_detail_members,   /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+    0,                              /* tp_alloc */
+    pjmedia_video_format_detail_new,       /* tp_new */
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+ * PyObj_pjmedia_format
+ * attribute list for media format
+ */
+typedef struct
+{
+    PyObject_HEAD
+    /* Type-specific fields go here. */ 
+    pj_uint32_t id;
+    PyObj_pjmedia_video_format_detail *vid;
+
+} PyObj_pjmedia_format;
+
+/*
+ * pjmedia_format_dealloc
+ * deletes a pjmedia_format from memory
+ */
+static void pjmedia_format_dealloc(PyObj_pjmedia_format* self)
+{      
+    Py_XDECREF(self->vid); 
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+/*
+ * pjmedia_format_new
+ * constructor for pjmedia_format object
+ */
+static PyObject * pjmedia_format_new(PyTypeObject *type, 
+			             PyObject *args,
+				     PyObject *kwds)
+{
+    PyObj_pjmedia_format *self;
+    
+    PJ_UNUSED_ARG(args);
+    PJ_UNUSED_ARG(kwds);
+    self = (PyObj_pjmedia_format *)type->tp_alloc(type, 0);
+    if (self != NULL) {
+        self->vid = (PyObj_pjmedia_video_format_detail *)
+		     PyType_GenericNew(&PyTyp_pjmedia_video_format_detail, 
+				       NULL, NULL);
+    }
+    return (PyObject *)self;
+}
+
+/*
+ * pjmedia_format_members
+ */
+static PyMemberDef pjmedia_format_members[] =
+{
+    {
+        "id", T_INT, 
+        offsetof(PyObj_pjmedia_format, id), 0,
+        "The format id that specifies the audio sample or video pixel format. Some well known formats ids are declared in pjmedia_format_id enumeration."
+    },
+    {
+        "vid", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_format, vid), 0,
+        "Detail section for video format."
+    },
+        
+    {NULL}  /* Sentinel */
+};
+
+/*
+ * PyTyp_pjmedia_format
+ */
+static PyTypeObject PyTyp_pjmedia_format=
+{
+    PyObject_HEAD_INIT(NULL)
+    0,                              /*ob_size*/
+    "_pjsua.PJMedia_Format",  /*tp_name*/
+    sizeof(PyObj_pjmedia_format),  /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor)pjmedia_format_dealloc,/*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,                              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    "PJMedia Format object",  /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    pjmedia_format_members,   /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+    0,                              /* tp_alloc */
+    pjmedia_format_new,       /* tp_new */
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+ * PyObj_pjmedia_codec_fmtp_param
+ * attribute list for codec fmtp param
+ */
+typedef struct
+{
+    PyObject_HEAD
+    /* Type-specific fields go here. */ 
+    PyObject *name;
+    PyObject *val; 
+
+} PyObj_pjmedia_codec_fmtp_param;
+
+/*
+ * pjmedia_vid_codec_param_dealloc
+ * deletes a pjmedia_vid_codec_param from memory
+ */
+static void pjmedia_codec_fmtp_param_dealloc(PyObj_pjmedia_codec_fmtp_param* self)
+{ 
+    Py_XDECREF(self->name); 
+    Py_XDECREF(self->val);      
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+/*
+ * pjmedia_pjmedia_codec_fmtp_param_new
+ * constructor for pjmedia_codec_fmtp_param object
+ */
+static PyObject * pjmedia_codec_fmtp_param_new(PyTypeObject *type, 
+					      PyObject *args,
+					      PyObject *kwds)
+{
+    PyObj_pjmedia_codec_fmtp_param *self;
+    
+    PJ_UNUSED_ARG(args);
+    PJ_UNUSED_ARG(kwds);
+
+    self = (PyObj_pjmedia_codec_fmtp_param *)type->tp_alloc(type, 0);
+    if (self != NULL) {
+        self->name = PyString_FromString("");
+	self->val = PyString_FromString("");
+    }
+    return (PyObject *)self;
+}
+
+/*
+ * pjmedia_codec_fmtp_param_members
+ */
+static PyMemberDef pjmedia_codec_fmtp_param_members[] =
+{
+    {
+        "name", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_codec_fmtp_param, name), 0,
+        "Parameter name."
+    }, 
+    {
+        "val", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_codec_fmtp_param, val), 0,
+        "Parameter value."
+    },       
+        
+    {NULL}  /* Sentinel */
+};
+
+
+/*
+ * PyTyp_pjmedia_codec_fmtp_param
+ */
+static PyTypeObject PyTyp_pjmedia_codec_fmtp_param=
+{
+    PyObject_HEAD_INIT(NULL)
+    0,                              /*ob_size*/
+    "_pjsua.PJMedia_Codec_Fmtp_Param",  /*tp_name*/
+    sizeof(PyObj_pjmedia_codec_fmtp_param),  /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor)pjmedia_codec_fmtp_param_dealloc,/*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,                              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    "PJMedia codec fmtp param object",  /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    pjmedia_codec_fmtp_param_members,   /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+    0,                              /* tp_alloc */
+    pjmedia_codec_fmtp_param_new,       /* tp_new */
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+ * PyObj_pjmedia_codec_fmtp
+ * attribute list for codec fmtp
+ */
+typedef struct
+{
+    PyObject_HEAD
+    /* Type-specific fields go here. */ 
+    pj_uint8_t cnt;
+    PyListObject *param;
+
+} PyObj_pjmedia_codec_fmtp;
+
+/*
+ * pjmedia_vid_codec_dealloc
+ * deletes a pjmedia_vid_codec from memory
+ */
+static void pjmedia_codec_fmtp_dealloc(PyObj_pjmedia_codec_fmtp* self)
+{ 
+    Py_XDECREF(self->param);
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+/*
+ * pjmedia_pjmedia_codec_fmtp_new
+ * constructor for pjmedia_codec_fmtp object
+ */
+static PyObject * pjmedia_codec_fmtp_new(PyTypeObject *type, 
+					 PyObject *args,
+					 PyObject *kwds)
+{
+    PyObj_pjmedia_codec_fmtp *self;
+    
+    PJ_UNUSED_ARG(args);
+    PJ_UNUSED_ARG(kwds);
+
+    self = (PyObj_pjmedia_codec_fmtp *)type->tp_alloc(type, 0);
+    if (self != NULL) {
+        int i;
+        for (i = 0; i < PJMEDIA_CODEC_MAX_FMTP_CNT; i++) {
+            PyObj_pjmedia_codec_fmtp_param *p = (PyObj_pjmedia_codec_fmtp_param *)
+	        PyType_GenericNew(&PyTyp_pjmedia_codec_fmtp_param, 
+	        NULL, NULL);
+            PyList_Append((PyObject *)self->param, (PyObject*)p);
+        }
+    }
+    return (PyObject *)self;
+}
+
+/*
+ * pjmedia_codec_fmtp_param_members
+ */
+static PyMemberDef pjmedia_codec_fmtp_members[] =
+{
+    {
+        "cnt", T_INT, 
+        offsetof(PyObj_pjmedia_codec_fmtp, cnt), 0,
+        "Parameter name."
+    }, 
+    {
+        "param", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_codec_fmtp, param), 0,
+        "Parameter value."
+    },       
+        
+    {NULL}  /* Sentinel */
+};
+
+
+/*
+ * PyTyp_pjmedia_codec_fmtp
+ */
+static PyTypeObject PyTyp_pjmedia_codec_fmtp=
+{
+    PyObject_HEAD_INIT(NULL)
+    0,                              /*ob_size*/
+    "_pjsua.PJMedia_Codec_Fmtp",  /*tp_name*/
+    sizeof(PyObj_pjmedia_codec_fmtp),  /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor)pjmedia_codec_fmtp_dealloc,/*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,                              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    "PJMedia codec fmtp object",    /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    pjmedia_codec_fmtp_members,     /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+    0,                              /* tp_alloc */
+    pjmedia_codec_fmtp_new,         /* tp_new */
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+ * PyObj_pjmedia_vid_codec_param
+ * attribute list for video codec parameter
+ */
+typedef struct
+{
+    PyObject_HEAD
+    /* Type-specific fields go here. */ 
+    PyObj_pjmedia_format *enc_fmt;
+    PyObj_pjmedia_codec_fmtp *enc_fmtp;
+    unsigned enc_mtu;
+    PyObj_pjmedia_format *dec_fmt;
+    PyObj_pjmedia_codec_fmtp *dec_fmtp;
+    pj_bool_t ignore_fmtp;
+
+} PyObj_pjmedia_vid_codec_param;
+
+/*
+ * pjmedia_vid_codec_param_dealloc
+ * deletes a pjmedia_vid_codec_param from memory
+ */
+static void pjmedia_vid_codec_param_dealloc(PyObj_pjmedia_vid_codec_param* self)
+{     
+    Py_XDECREF(self->enc_fmt);  
+    Py_XDECREF(self->enc_fmtp);
+    Py_XDECREF(self->dec_fmt);  
+    Py_XDECREF(self->dec_fmtp);
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+/*
+ * pjmedia_vid_codec_param_new
+ * constructor for pjmedia_vid_codec_param object
+ */
+static PyObject * pjmedia_vid_codec_param_new(PyTypeObject *type, 
+					      PyObject *args,
+					      PyObject *kwds)
+{
+    PyObj_pjmedia_vid_codec_param *self;
+    
+    PJ_UNUSED_ARG(args);
+    PJ_UNUSED_ARG(kwds);
+    self = (PyObj_pjmedia_vid_codec_param *)type->tp_alloc(type, 0);
+    if (self != NULL) {
+        self->enc_fmt = (PyObj_pjmedia_format *)
+		     PyType_GenericNew(&PyTyp_pjmedia_format, 
+				       NULL, NULL);
+        self->enc_fmtp = (PyObj_pjmedia_codec_fmtp *)
+		     PyType_GenericNew(&PyTyp_pjmedia_codec_fmtp, 
+				       NULL, NULL);
+        self->dec_fmt = (PyObj_pjmedia_format *)
+		     PyType_GenericNew(&PyTyp_pjmedia_format, 
+				       NULL, NULL);
+        self->dec_fmtp = (PyObj_pjmedia_codec_fmtp *)
+		     PyType_GenericNew(&PyTyp_pjmedia_codec_fmtp, 
+				       NULL, NULL);
+    }
+    return (PyObject *)self;
+}
+
+/*
+ * pjmedia_vid_codec_param_members
+ */
+static PyMemberDef pjmedia_vid_codec_param_members[] =
+{
+    {
+        "enc_fmt", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_vid_codec_param, enc_fmt), 0,
+        "Encoded format"
+    },
+    {
+        "enc_fmtp", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_vid_codec_param, enc_fmtp), 0,
+        "Encoder fmtp params"
+    },
+    {
+        "enc_mtu", T_INT, 
+        offsetof(PyObj_pjmedia_vid_codec_param, enc_mtu), 0,
+        "MTU or max payload size setting."
+    },
+    {
+        "dec_fmt", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_vid_codec_param, dec_fmt), 0,
+        "Decoded format"
+    },
+    {
+        "dec_fmtp", T_OBJECT_EX, 
+        offsetof(PyObj_pjmedia_vid_codec_param, dec_fmtp), 0,
+        "Decoder fmtp params"
+    },
+    {
+        "ignore_fmtp", T_INT, 
+        offsetof(PyObj_pjmedia_vid_codec_param, ignore_fmtp), 0,
+        "Ignore fmtp params. If set to PJ_TRUE, the codec will apply format settings specified in enc_fmt and dec_fmt only."
+    },
+        
+    {NULL}  /* Sentinel */
+};
+
+
+/*
+ * PyTyp_pjmedia_vid_codec_param
+ */
+static PyTypeObject PyTyp_pjmedia_vid_codec_param=
+{
+    PyObject_HEAD_INIT(NULL)
+    0,                              /*ob_size*/
+    "_pjsua.PJMedia_Vid_Codec_Param",  /*tp_name*/
+    sizeof(PyObj_pjmedia_vid_codec_param),  /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor)pjmedia_vid_codec_param_dealloc,/*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,                              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    "PJMedia Vid Codec Parameter object",  /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    pjmedia_vid_codec_param_members,   /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+    0,                              /* tp_alloc */
+    pjmedia_vid_codec_param_new,       /* tp_new */
 
 };
 
@@ -3379,6 +4540,8 @@ typedef struct
     /* Type-specific fields go here. */ 
     
     int		 id;
+
+
     int		 role;
     int		 acc_id;
     PyObject	*local_info;
@@ -3395,6 +4558,7 @@ typedef struct
     int		 conf_slot;
     int		 connect_duration;
     int		 total_duration;
+    int          vid_cnt;
 
 } PyObj_pjsua_call_info;
 
@@ -3531,6 +4695,11 @@ static PyMemberDef call_info_members[] =
         offsetof(PyObj_pjsua_call_info, total_duration), 0,
         "Total call duration, including set-up time"        
     },
+    {
+        "vid_cnt", T_INT,
+        offsetof(PyObj_pjsua_call_info, vid_cnt), 0,
+        "Number of video streams offered by remote "        
+    },
     
     {NULL}  /* Sentinel */
 };
@@ -3584,6 +4753,7 @@ static PyTypeObject PyTyp_pjsua_call_info =
     call_info_new,		    /* tp_new */
 
 };
+
 
 
 //////////////////////////////////////////////////////////////////////////////
