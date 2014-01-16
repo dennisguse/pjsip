@@ -6,7 +6,6 @@ It was created to:
 2. add patches that didn't made it yet upstream
 
 It was setup using the following command:
-
 # git svn clone HEAD http://svn.pjsip.org/repos/pjproject/ -s
 
 By cloning the connection to "git svn" is lost. If you would like to use the "git svn rebase" for updates from upstream:
@@ -29,7 +28,11 @@ If you don't know what it is: just ignore it.
 # export DIST=saucy
 
 - for upload (signed source package); Use your PGP-Keyid:
+<<<<<<< HEAD
 # git-buildpackage --git-upstream-tree=XXX --git-ignore-branch --git-dist=saucy -S -kKEY_ID
+=======
+# git-buildpackage --git-upstream-tree=XXX -git-ignore-branch --git-submodules --git-dist=saucy -S -kKEY_ID
+>>>>>>> Updated README.
 - binary deb
 # git-buildpackage --git-upstream-tree=XXX --git-ignore-branch --git-dist=saucy
 - replace XXX to select the tree you want.
