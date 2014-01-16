@@ -6,12 +6,7 @@ It was created to:
 2. add patches that didn't made it yet upstream
 
 It was setup using the following command:
-# git svn clone -r4650:HEAD http://svn.pjsip.org/repos/pjproject/trunk
-and the portaudio-lib (also a git svn clone of the original svn-repo) important from 
-# git submodule add https://github.com/dennisguse/portaudio.git third_party/portaudio
-
-to clone the repository do this:
-# git clone --recursive https://github.com/dennisguse/pjsip.git
+# git svn clone HEAD http://svn.pjsip.org/repos/pjproject/ -s
 
 By cloning the connection to "git svn" is lost. If you would like to use the "git svn rebase" for updates from upstream:
 http://stackoverflow.com/questions/5339838/cloning-a-git-svn-repository-with-svn-metadata
@@ -33,7 +28,7 @@ If you don't know what it is: just ignore it.
 # export DIST=saucy
 
 - for upload (signed source package); Use your PGP-Keyid:
-# git-buildpackage --git-upstream-tree=XXX -git-ignore-branch --git-submodules --git-dist=saucy -S -k3103E9ED
+# git-buildpackage --git-upstream-tree=XXX -git-ignore-branch --git-submodules --git-dist=saucy -S -kKEY_ID
 - binary deb
 # git-buildpackage --git-upstream-tree=XXX -git-ignore-branch --git-submodules --git-dist=saucy
 - replace XXX to select the tree you want.
