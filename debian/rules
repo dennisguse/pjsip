@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+%:
+	dh $@  --with autotools-dev
+
+##configure fails (if handed over correctly - which is not done yet), if set (reason unknown)
+#CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
+#CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
+#CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
+#LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+
+#ARCH AMD64 needs -fPIC
+ifeq ($(shell dpkg-architecture -qDEB_HOST_ARCH), amd64)
+       CFLAGS += -fPIC
+       CXXFLAGS += -fPIC
+endif
+
+#Configure PJSip options
+#CFLAGS += -DPJMEDIA_HAS_VIDEO=1
+#Is not yet working as libsdl2-dev is needed, which is included in 13.10 onwards
+
+override_dh_auto_configure:
+	#./configure is buggy as parameters are not handed over to ./aconfigure, which is the new configure-script ("") is missing.
+	dh_auto_configure -- CFLAGS=$(CFLAGS) CXXFLAGS=$(CXXFLAGS)
+
+override_dh_auto_build:
+	dh_auto_build --
+
+	echo "Building pjsip/samples/vidgui"
+	cd pjsip-apps/src/vidgui && make -f pj-pkgconfig.mak && qmake-qt4 && make
+
+override_dh_install:
+	echo "Install python-bindings (also compiles)."
+	cd pjsip-apps/src/python/ && python setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
+
+	echo "Install pjsip samples (1)."
+	mkdir -p $(CURDIR)/debian/tmp/usr/lib/libpjsip-samples/
+	cp -a -r $(CURDIR)/pjsip-apps/bin/samples/*/* $(CURDIR)/debian/tmp/usr/lib/libpjsip-samples/
+	echo "Install pjsip samples (2): vidgui."
+	cp -a -r $(CURDIR)/pjsip-apps/src/vidgui/vidgui $(CURDIR)/debian/tmp/usr/lib/libpjsip-samples/
+
+	dh_install --
