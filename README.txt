@@ -6,6 +6,7 @@ It was created to:
 2. add patches that didn't made it yet upstream
 
 It was setup using the following command:
+
 # git svn clone HEAD http://svn.pjsip.org/repos/pjproject/ -s
 
 By cloning the connection to "git svn" is lost. If you would like to use the "git svn rebase" for updates from upstream:
