@@ -1,0 +1,4 @@
+This package provides the SIP implementation pjsip (http://www.pjsip.org).
+It includes the library, python-bindings and samples.
+
+The library is build without video-support for Ubuntu 13.04.

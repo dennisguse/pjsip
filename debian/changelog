@@ -1,0 +1,12 @@
+pjsip (2.1+R4562+SNAPSHOT2) saucy; urgency=low
+
+  * Added first draft for python-bindings: video
+  * Added sample/vidgui patch, so it builds sucessfully
+ -- Dennis Guse <dennis.guse@alumni.tu-berlin.de>  Thu, 19 Dec 2013 16:14:47 +0100
+
+pjsip (2.1+R4562+SNAPSHOT1) saucy; urgency=low
+
+   * Forked upstream svn to git repository.
+   * Enabled video support (and a small fix to compile with Ubuntu's libav).
+   * Fix for vidgui sample.
+ -- Dennis Guse <dennis.guse@alumni.tu-berlin.de>  Thu, 24 Oct 2013 16:33:17 +0200
