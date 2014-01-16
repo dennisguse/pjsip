@@ -1,6 +1,6 @@
 Dennis Guse, 2013
 
-This git-repository is a clone of the original pjproject-svn (at the moment revision r4562).
+This git-repository is a clone of the original pjproject-svn (branch upstream contains the svn-trunk).
 It was created to:
 1. make debian package building easier (configuration and small patches so it can be build for ubuntu)
 2. add patches that didn't made it yet upstream
