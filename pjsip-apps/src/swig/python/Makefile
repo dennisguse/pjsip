@@ -21,7 +21,8 @@ clean distclean realclean:
 	rm -rf $(PYTHON_SO) pjsua2_wrap.cpp pjsua2_wrap.h pjsua2.py build *.pyc
 
 install:
-	python setup.py install --user
+#	python setup.py install --user
+	python setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
 
 uninstall:
 	rm -f $(HOME)/.local/lib/python2.7/site-packages/pjsua2*
