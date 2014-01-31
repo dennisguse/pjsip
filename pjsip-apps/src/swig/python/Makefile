@@ -29,7 +29,8 @@ clean distclean realclean:
 	rm -f gcc.exe g++.exe
 
 install:
-	python setup.py install --user
+#	python setup.py install --user
+	python setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
 
 uninstall:
 	rm -f $(HOME)/.local/lib/python2.7/site-packages/pjsua2*
