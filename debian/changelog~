@@ -6,21 +6,21 @@ pjproject (svn4714+SNAPSHOT3) saucy; urgency=low
  -- dennis <dennis.guse@alumni.tu-berlin.de>  Fri, 31 Jan 2014 23:00:52 +0100
 
 pjproject (svn4714+SNAPSHOT1) saucy; urgency=low
+=======
+pjsip (2.1+R4714+SNAPSHOT2) saucy; urgency=low
+
+  * Enabled PJSUA2 and added python-pjsua2.
+
+ -- dennis <dennis@x201>  Fri, 31 Jan 2014 23:00:52 +0100
+
+pjsip (2.1+R4714+SNAPSHOT1) saucy; urgency=low
+>>>>>>> Changelog.
 
   * Switched to ALSA and disabled Portaudio.
 
  -- dennis <dennis.guse@xalumni.tu-berlin.de>  Fri, 31 Jan 2014 22:04:38 +0100
 
 pjproject (svn4562+SNAPSHOT2) saucy; urgency=low
-=======
-pjsip (2.1+R4714+SNAPSHOT1) saucy; urgency=low
-
-  * Switched to ALSA and disabled Portaudio.
-
- -- dennis <dennis@x201>  Fri, 31 Jan 2014 22:04:38 +0100
-
-pjsip (2.1+R4562+SNAPSHOT2) saucy; urgency=low
->>>>>>> Preparation to PJSUA2 swig generation bindings.
 
   * Added first draft for python-bindings: video
   * Added sample/vidgui patch, so it builds sucessfully
