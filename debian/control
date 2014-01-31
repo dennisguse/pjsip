@@ -1,7 +1,7 @@
 Source: pjsip
 Priority: extra
 Maintainer: Dennis Guse <dennis.guse@alumni.tu-berlin.de>
-Build-Depends: debhelper (>= 8.0.0), autotools-dev, python, libpython-dev, libssl-dev, pulseaudio, libasound2-plugins, libasound2-dev, libpulse-dev, uuid-dev , libsdl2-dev, libavdevice-dev, libav-source, libv4l-dev, libswscale-dev, qt4-dev-tools, libqt4-dev, gdb, swig
+Build-Depends: debhelper (>= 8.0.0), autotools-dev, python, libpython-dev, libssl-dev, pulseaudio, libasound2-plugins, libasound2-dev, libpulse-dev, uuid-dev , libsdl2-dev, libavdevice-dev, libav-source, libv4l-dev, libswscale-dev, qt4-dev-tools, libqt4-dev, gdb, swig, default-jdk
 Standards-Version: 3.9.4
 Section: libs
 Homepage: http://www.pjsip.org
