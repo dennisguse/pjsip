@@ -2,13 +2,13 @@ pjsip (2.1+R4714+SNAPSHOT2) saucy; urgency=low
 
   * Enabled PJSUA2 and added python-pjsua2.
 
- -- dennis <dennis@x201>  Fri, 31 Jan 2014 23:00:52 +0100
+ -- dennis <dennis.guse@alumni.tu-berlin.de>  Fri, 31 Jan 2014 23:00:52 +0100
 
 pjsip (2.1+R4714+SNAPSHOT1) saucy; urgency=low
 
   * Switched to ALSA and disabled Portaudio.
 
- -- dennis <dennis@x201>  Fri, 31 Jan 2014 22:04:38 +0100
+ -- dennis <dennis.guse@xalumni.tu-berlin.de>  Fri, 31 Jan 2014 22:04:38 +0100
 
 pjsip (2.1+R4562+SNAPSHOT2) saucy; urgency=low
 
