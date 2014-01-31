@@ -18,12 +18,6 @@ ifeq ($(shell dpkg-architecture -qDEB_HOST_ARCH), amd64)
 endif
 
 #Configure PJSip options
-<<<<<<< HEAD
-=======
-#CFLAGS += -DPJMEDIA_HAS_VIDEO=1
-#Is not yet working as libsdl2-dev is needed, which is included in 13.10 onwards
-
->>>>>>> Added ubuntu 13.10 packaging information.
 override_dh_auto_configure:
 	#./configure is buggy as parameters are not handed over to ./aconfigure, which is the new configure-script ("") is missing.
 	dh_auto_configure -- CFLAGS=$(CFLAGS) CXXFLAGS=$(CXXFLAGS)
@@ -31,37 +25,34 @@ override_dh_auto_configure:
 override_dh_auto_build:
 	dh_auto_build --
 
-<<<<<<< HEAD
 	echo "Building language bindings for PJSUA2 using -swig."
 	cd pjsip-apps/src/swig && make
 
-=======
->>>>>>> Added ubuntu 13.10 packaging information.
 	echo "Building pjsip/samples/vidgui"
 	cd pjsip-apps/src/vidgui && make -f pj-pkgconfig.mak && qmake-qt4 && make
 
 override_dh_install:
-<<<<<<< HEAD
 	echo "Build and Install python-pjsua."
 	cd pjsip-apps/src/python/ && python setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
 
 	echo "Install PJSUA2 swing bindings."
+<<<<<<< HEAD
+<<<<<<< HEAD
 	cd pjsip-apps/src/swig/python && python setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
 #	cd pjsip-apps/src/swig/python && python3 setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
 #	cd pjsip-apps/src/swig/python && make install #Not working
-
-	echo "Install pjsip samples (1)."
-	mkdir -p $(CURDIR)/debian/tmp/usr/lib/libpjsip-samples/
-	cp -a -r $(CURDIR)/pjsip-apps/bin/samples/*/* $(CURDIR)/debian/tmp/usr/lib/libpjsip-samples/
-
 =======
-	echo "Install python-bindings (also compiles)."
-	cd pjsip-apps/src/python/ && python setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
+	cd pjsip-apps/src/swig && make install
+>>>>>>> Preparation to PJSUA2 swig generation bindings.
+=======
+	cd pjsip-apps/src/swig/python && python setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
+#	cd pjsip-apps/src/swig/python && make install #Not working
+>>>>>>> Fixed installation rules for python-pjsua2.
 
 	echo "Install pjsip samples (1)."
 	mkdir -p $(CURDIR)/debian/tmp/usr/lib/libpjsip-samples/
 	cp -a -r $(CURDIR)/pjsip-apps/bin/samples/*/* $(CURDIR)/debian/tmp/usr/lib/libpjsip-samples/
->>>>>>> Added ubuntu 13.10 packaging information.
+
 	echo "Install pjsip samples (2): vidgui."
 	cp -a -r $(CURDIR)/pjsip-apps/src/vidgui/vidgui $(CURDIR)/debian/tmp/usr/lib/libpjsip-samples/
 
