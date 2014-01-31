@@ -28,9 +28,9 @@ If you don't know what it is: just ignore it.
 # export DIST=saucy
 
 - for upload (signed source package); Use your PGP-Keyid:
-# git-buildpackage --git-upstream-tree=XXX -git-ignore-branch --git-dist=saucy -S -kKEY_ID
+# git-buildpackage --git-upstream-tree=XXX --git-ignore-branch --git-dist=saucy -S -kKEY_ID
 - binary deb
-# git-buildpackage --git-upstream-tree=XXX -git-ignore-branch --git-dist=saucy
+# git-buildpackage --git-upstream-tree=XXX --git-ignore-branch --git-dist=saucy
 - replace XXX to select the tree you want.
 
 4. Clean
