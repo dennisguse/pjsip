@@ -21,7 +21,7 @@ Description: PJSIP library
 Package: python-pjsua
 Section: python
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libpjsip-dev, python-pyaudio, python-qt4, python-support (>= 0.90)
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-pyaudio, python-qt4, python-support (>= 0.90)
 Description: PJSIP library - python bindings
  PJSIP library (aka pjproject) a capable SIP implementation.
  Includes the python bindings for PJSUA (old API).
@@ -29,7 +29,7 @@ Description: PJSIP library - python bindings
 Package: python-pjsua2
 Section: python
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libpjsip-dev, python-pyaudio, python-qt4, python-support (>= 0.90)
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-pyaudio, python-qt4, python-support (>= 0.90)
 Description: PJSIP library - python bindings
  PJSIP library (aka pjproject) a capable SIP implementation.
  Includes the python bindings for PJSUA2 (generated using swig).
