@@ -1,3 +1,9 @@
+pjsip (2.1+R4714+SNAPSHOT1) saucy; urgency=low
+
+  * Switched to ALSA and disabled Portaudio.
+
+ -- dennis <dennis@x201>  Fri, 31 Jan 2014 22:04:38 +0100
+
 pjsip (2.1+R4562+SNAPSHOT2) saucy; urgency=low
 
   * Added first draft for python-bindings: video
