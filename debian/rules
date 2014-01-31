@@ -37,6 +37,7 @@ override_dh_install:
 
 	echo "Install PJSUA2 swing bindings."
 	cd pjsip-apps/src/swig/python && python setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
+#	cd pjsip-apps/src/swig/python && python3 setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp
 #	cd pjsip-apps/src/swig/python && make install #Not working
 
 	echo "Install pjsip samples (1)."
