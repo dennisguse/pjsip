@@ -96,6 +96,7 @@ public class MainActivity extends Activity implements Handler.Callback, MyAppObs
 	    if (app.accList.size() == 0) {
 	    	accCfg = new AccountConfig();
 	    	accCfg.setIdUri("sip:localhost");
+	    	accCfg.getNatConfig().setIceEnabled(true);
 	    	account = app.addAcc(accCfg);
 	    } else {
 	    	account = app.accList.get(0);
@@ -179,7 +180,11 @@ public class MainActivity extends Activity implements Handler.Callback, MyAppObs
 			
 			MyBuddy buddy = (MyBuddy) m.obj;
 			int idx = account.buddyList.indexOf(buddy);
-			if (idx >= 0) {
+
+			/* Update buddy status text, if buddy is valid and
+			 * the buddy lists in account and UI are sync-ed.
+			 */
+			if (idx >= 0 && account.buddyList.size() == buddyList.size()) {
 				buddyList.get(idx).put("status", buddy.getStatusText());
 				buddyListAdapter.notifyDataSetChanged();
 				// TODO: selection color/mark is gone after this,
@@ -291,6 +296,9 @@ public class MainActivity extends Activity implements Handler.Callback, MyAppObs
 						proxies.add(proxy);
 					}
 					
+			    	/* Enable ICE */
+			    	accCfg.getNatConfig().setIceEnabled(true);
+			    	
 					/* Finally */
 					lastRegStatus = "";
 					try {
