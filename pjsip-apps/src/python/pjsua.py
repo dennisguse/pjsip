@@ -2273,6 +2273,9 @@ class Lib:
     def stop_video_preview(self):
         return _pjsua.vid_preview_stop()
 
+    def resize_video_preview(self, capture_device = -1, size_x = 100, size_y = 100):
+        return _pjsua.vid_preview_resize(capture_device, size_x, size_y)
+
     def vid_dev_count(self):
         return _pjsua.vid_dev_count()
 

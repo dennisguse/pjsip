@@ -3089,6 +3089,29 @@ static PyObject *py_pj_vid_preview_stop(PyObject *pSelf, PyObject *pArgs)
     Py_RETURN_TRUE;
 }
 
+static PyObject *py_pj_vid_preview_resize(PyObject *pSelf, PyObject *pArgs)
+{ 
+    int size_x = 0;
+    int size_y = 0;
+    int capture_device = 0;
+
+    PJ_UNUSED_ARG(pSelf);
+
+    if(!PyArg_ParseTuple(pArgs, "iii",&capture_device, &size_x, &size_y)) {
+        return NULL;
+    }
+
+    pjsua_vid_win_id wid;
+    pjsua_vid_win_info wi;
+    pj_status_t status;
+
+    wid = pjsua_vid_preview_get_win(capture_device);
+    pjsua_vid_win_get_info(wid, &wi);
+    const pjmedia_rect_size size = {size_x, size_y};
+    status = pjsua_vid_win_set_size(wid, &size);
+    return Py_BuildValue("i", status);  
+}
+
 static PyObject *py_pj_vid_dev_count(PyObject *pSelf, PyObject *pArgs) 
 {
     PJ_UNUSED_ARG(pSelf);
@@ -3481,6 +3504,10 @@ static char py_pj_vid_preview_start_doc[] =
 static char py_pj_vid_preview_stop_doc[] =
     "int _pjsua.vid_preview_stop(int videoDeviceId)"
     "Stop video preview.";
+
+static char py_pj_vid_preview_resize_doc[] =
+    "int _pjsua.vid_preview_stop(int videoDeviceId, int size_x, int size_y)"
+    "Resize video preview.";
 
 static char py_pj_vid_codec_set_priority_doc[] =
     "Change video codec priority."
@@ -5047,6 +5074,10 @@ static PyMethodDef py_pjsua_methods[] =
     {   
         "vid_preview_stop", py_pj_vid_preview_stop, METH_VARARGS, 
         py_pj_vid_preview_stop_doc
+    },
+    {   
+        "vid_preview_resize", py_pj_vid_preview_resize, METH_VARARGS, 
+        py_pj_vid_preview_resize_doc
     },
     {
         "vid_preview_get_win", py_pj_vid_preview_get_win, METH_VARARGS, 
