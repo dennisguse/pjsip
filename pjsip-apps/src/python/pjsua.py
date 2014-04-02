@@ -42,6 +42,7 @@ library based on PJSIP stack (http://www.pjsip.org)
      - RTP/RTCP
      - Secure RTP (SRTP)
      - WAV playback, recording, and playlist
+     - Video API (NEW)
   - NAT traversal features
      - Symmetric RTP
      - STUN
@@ -461,6 +462,17 @@ class MediaConfig:
             cfg.turn_passwd = self.turn_cred.passwd
         return cfg
 
+class VideoDeviceInfo:
+    dev_name = None
+    caps = 0
+     
+    def __init__(self, deviceID):
+        default = _pjsua.vid_dev_get_info(deviceID)
+        self._cvt_from_pjsua(default)
+
+    def _cvt_from_pjsua(self, cfg):
+        self.dev_name = cfg.dev_name
+        self.caps = cfg.caps
 
 class TransportConfig:
     """SIP transport configuration class.
@@ -775,6 +787,8 @@ class AccountConfig:
     use_srtp = 0
     srtp_secure_signaling = 1
     rtp_transport_cfg = None
+    vid_in_auto_show = False
+    vid_out_auto_transmit = False
 
     def __init__(self, domain="", username="", password="", 
                  display="", registrar="", proxy=""):
@@ -867,6 +881,8 @@ class AccountConfig:
         self.srtp_secure_signaling = cfg.srtp_secure_signaling
         if (self.rtp_transport_cfg is not None):
             self.rtp_transport_cfg._cvt_from_pjsua(cfg.rtp_transport_cfg)
+        self.vid_in_auto_show = cfg.vid_in_auto_show
+        self.vid_out_auto_transmit = cfg.vid_out_auto_transmit
 
     def _cvt_to_pjsua(self):
         cfg = _pjsua.acc_config_default()
@@ -896,10 +912,12 @@ class AccountConfig:
         cfg.ka_data = self.ka_data
         cfg.use_srtp = self.use_srtp
         cfg.srtp_secure_signaling = self.srtp_secure_signaling
+        cfg.vid_in_auto_show = self.vid_in_auto_show 
+        cfg.vid_out_auto_transmit = self.vid_out_auto_transmit
 
         if (self.rtp_transport_cfg is not None):
-            cfg.rtp_transport_cfg = self.rtp_transport_cfg._cvt_to_pjsua()
-        
+            cfg.rtp_transport_cfg = self.rtp_transport_cfg._cvt_to_pjsua()               
+
         return cfg
  
  
@@ -1526,6 +1544,7 @@ class CallInfo:
     conf_slot = -1
     call_time = 0
     total_time = 0
+    vid_cnt = 0
 
     def __init__(self, lib=None, ci=None):
         if lib and ci:
@@ -1548,7 +1567,7 @@ class CallInfo:
         self.conf_slot = ci.conf_slot
         self.call_time = ci.connect_duration / 1000
         self.total_time = ci.total_duration / 1000
-
+        self.vid_cnt = ci.vid_cnt
 
 class Call:
     """This class represents SIP call.
@@ -1809,7 +1828,10 @@ class Call:
                              im_id)
         self._lib()._err_check("send_pager()", self, err)
 
-  
+    def get_remote_video(self):
+        lck = self._lib().auto_lock()
+        return _pjsua.call_get_vid_win(self._id);
+
 class BuddyInfo:
     """This class contains information about Buddy. Application may 
     retrieve this information by calling Buddy.info().
@@ -2038,12 +2060,14 @@ class SoundDeviceInfo:
     input_channels = 0
     output_channels = 0
     default_clock_rate = 0
+    device_id = 0
 
     def __init__(self, sdi):
         self.name = sdi.name
         self.input_channels = sdi.input_count
         self.output_channels = sdi.output_count
         self.default_clock_rate = sdi.default_samples_per_sec
+        self.device_id = sdi.device_id
 
 
 # Codec info
@@ -2240,6 +2264,58 @@ class Lib:
         self._has_thread = with_thread
         if self._has_thread:
             thread.start_new(_worker_thread_main, (0,))
+
+    #Video Device API
+
+    def start_video_preview(self, capture_device = -1, render_device = -2):
+        return _pjsua.vid_preview_start(capture_device, render_device)
+
+    def stop_video_preview(self):
+        return _pjsua.vid_preview_stop()
+
+    def vid_dev_count(self):
+        return _pjsua.vid_dev_count()
+
+    def vid_dev_get_info(self, deviceId):
+        return _pjsua.vid_dev_get_info(deviceId)
+
+    def vid_enum_devs(self):
+        return _pjsua.vid_enum_devs()
+
+    def vid_enum_codecs(self):
+        return _pjsua.vid_enum_codecs()
+
+    def vid_codec_get_param(self, codecId):
+        return _pjsua.vid_codec_get_param(codecId)
+
+    def vid_codec_set_priority(self, codecId, priority):
+        return _pjsua.vid_codec_set_priority(codecId, priority)
+
+    def vid_preview_has_native(self, deviceId):
+        return _pjsua.vid_preview_has_native(deviceId)
+
+    def vid_preview_get_win(self, deviceId):
+        return _pjsua.vid_preview_get_win(deviceId)
+
+    def vid_enum_wins(self):
+        return _pjsua.vid_enum_wins()
+
+    def vid_win_get_info(self, winId):
+        return _pjsua.vid_win_get_info(winId)
+
+    def vid_win_set_show(self, winId, isShow):
+        return _pjsua.vid_win_set_show(winId, isShow)
+
+    def vid_win_set_pos(self, winId, pos_x, pos_y):
+        return _pjsua.vid_win_set_pos(winId, pos_x, pos_y)
+      
+    def vid_win_set_size(self, winId, size_x, size_y):
+        return _pjsua.vid_win_set_size(winId, size_x, size_y)
+    
+    def vid_win_rotate(self, winId, angle):
+        return _pjsua.vid_win_rotate(winId, angle)  
+    
+    #END OF Video Device API
 
     def handle_events(self, timeout=50):
         """Poll the events from underlying pjsua library.
@@ -2693,7 +2769,6 @@ class Lib:
         lck = self.auto_lock()
         err = _pjsua.recorder_destroy(rec_id)
         self._err_check("recorder_destroy()", self, err)
-
 
     # Internal functions
 

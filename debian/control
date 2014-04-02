@@ -1,0 +1,43 @@
+Source: pjproject
+Priority: extra
+Maintainer: Dennis Guse <dennis.guse@alumni.tu-berlin.de>
+Build-Depends: debhelper (>= 8.0.0), autotools-dev, python, libpython-dev, libssl-dev, pulseaudio, libasound2-plugins, libasound2-dev, libpulse-dev, uuid-dev , libsdl2-dev, libavdevice-dev, libav-source, libv4l-dev, libswscale-dev, qt4-dev-tools, libqt4-dev, gdb, swig, default-jdk, libopencore-amrnb-dev, libopencore-amrwb-dev
+Standards-Version: 3.9.4
+Section: libs
+Homepage: http://www.pjsip.org
+#Vcs-Git: git://git.debian.org/collab-maint/pjproject.git
+Vcs-Browser: http://trac.pjsip.org/repos/browser/pjproject
+#libswscale-dev as well as runtime libswscale2?
+
+Package: libpjsip-dev
+Section: libdevel
+Architecture: any
+#${shlibs:Depends}, ${misc:Depends}, 
+Depends: mime-support, libglib2.0-0, libpopt0, libgl1-mesa-glx, pkg-config, libegl1-mesa, libpcre3, uuid-runtime, mawk, python, python-support (>= 0.90), pulseaudio, libasound2-plugins, libv4l-dev
+Description: PJSIP library
+ PJSIP library (aka pjproject) a capable SIP implementation.
+ Libraries are linked static.
+
+Package: python-pjsua
+Section: python
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-pyaudio, python-qt4, python-support (>= 0.90)
+Description: PJSIP library - python bindings
+ PJSIP library (aka pjproject) a capable SIP implementation.
+ Includes the python bindings for PJSUA (old API).
+
+Package: python-pjsua2
+Section: python
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-pyaudio, python-qt4, python-support (>= 0.90)
+Description: PJSIP library - python bindings
+ PJSIP library (aka pjproject) a capable SIP implementation.
+ Includes the python bindings for PJSUA2 (generated using swig).
+
+Package: libpjsip-samples
+Section: libdevel
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libpjsip-dev
+Description: PJSIP library
+ PJSIP library (aka pjproject) a capable SIP implementation.
+ Includes samples.

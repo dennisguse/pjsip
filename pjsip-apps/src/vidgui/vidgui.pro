@@ -17,8 +17,8 @@ win32 {
   	  dxguid.lib netapi32.lib mswsock.lib ws2_32.lib odbc32.lib \
   	  odbccp32.lib ole32.lib user32.lib gdi32.lib advapi32.lib 
 } else {
-  LIBS += $$system(make -f pj-pkgconfig.mak ldflags)
-  QMAKE_CXXFLAGS += $$system(make --silent -f pj-pkgconfig.mak cflags)
+  LIBS += $$system(make --silent --no-print-directory -f pj-pkgconfig.mak ldflags) -LX11 -lX11
+  QMAKE_CXXFLAGS += $$system(make --no-print-directory --silent -f pj-pkgconfig.mak cflags)
 
   macx {
     QMAKE_CXXFLAGS += -ObjC++
@@ -27,8 +27,10 @@ win32 {
 
 TEMPLATE = app
 CONFIG += thread debug
-TARGET = 
-DEPENDPATH += .
+TARGET = vidgui
+DEPENDPATH +=
+
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets x11extras
 
 # Input
 HEADERS += vidgui.h vidwin.h
