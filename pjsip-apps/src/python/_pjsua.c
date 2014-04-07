@@ -18,12 +18,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
  */
 #include "_pjsua.h"
-#include <X11/Xlib.h>
-
-//TODO REMOVE 
-#include <stdio.h>
-//REMOVE TILL HERE
-
 
 #define THIS_FILE    "main.c"
 #define POOL_SIZE    512
@@ -2682,14 +2676,14 @@ static PyObject *py_pjsua_enum_snd_devs(PyObject *pSelf, PyObject *pArgs)
 {
     pj_status_t status;
     PyObject *ret;
-    pjmedia_aud_dev_info info[SND_DEV_NUM];
+    pjmedia_snd_dev_info info[SND_DEV_NUM];
     unsigned c, i;
 
     PJ_UNUSED_ARG(pSelf);
     PJ_UNUSED_ARG(pArgs);
 
     c = PJ_ARRAY_SIZE(info);
-    status = pjsua_enum_aud_devs(info, &c);
+    status = pjsua_enum_snd_devs(info, &c);
     if (status != PJ_SUCCESS)
 	c = 0;
     
@@ -2697,16 +2691,12 @@ static PyObject *py_pjsua_enum_snd_devs(PyObject *pSelf, PyObject *pArgs)
     for (i = 0; i < c; i++)  {
         PyObj_pjmedia_snd_dev_info * obj;
 
- 	int device_id = 0;
-        pjmedia_aud_dev_lookup(info[i].driver, info[i].name, &device_id);
- 
         obj = (PyObj_pjmedia_snd_dev_info *)
 	      pjmedia_snd_dev_info_new(&PyTyp_pjmedia_snd_dev_info, 
 				       NULL, NULL);
         obj->default_samples_per_sec = info[i].default_samples_per_sec;
         obj->input_count = info[i].input_count;
         obj->output_count = info[i].output_count;
-        obj->device_id = device_id;
         obj->name = PyString_FromString(info[i].name);
 
         PyList_SetItem(ret, i, (PyObject *)obj);
@@ -3047,487 +3037,6 @@ static char pjsua_codec_set_param_doc[] =
     "_pjsua.PJMedia_Codec_Param param) "
     "Set codec parameters.";
 
-
-static PyObject *py_pj_vid_preview_start(PyObject *pSelf, PyObject *pArgs)
-{ 
-    int capture_device = 0;
-    int render_device = 0;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if(!PyArg_ParseTuple(pArgs, "ii", &capture_device, &render_device)) {
-        return NULL;
-    }
-
-    pjsua_vid_win_id wid;
-    pjsua_vid_win_info wi;
-    pjsua_vid_preview_param pre_param;
-    pj_status_t status;
-    pjsua_vid_preview_param_default(&pre_param);
-    pre_param.rend_id = render_device;
-    pre_param.show = PJ_FALSE;
-    
-    status = pjsua_vid_preview_start(capture_device, &pre_param);
-    if (status != PJ_SUCCESS) {
-        char errmsg[PJ_ERR_MSG_SIZE];
-	    pj_strerror(status, errmsg, sizeof(errmsg));
-	    return NULL;
-    }
-    
-    wid = pjsua_vid_preview_get_win(capture_device);
-    pjsua_vid_win_get_info(wid, &wi); //TODO check status
-    Window w = (Window)wi.hwnd.info.x11.window; //TODO Could we make this platform independant using ifdefs? 
-    
-    return Py_BuildValue("k", w);
-}
-
-static PyObject *py_pj_vid_preview_stop(PyObject *pSelf, PyObject *pArgs)
-{
-    PJ_UNUSED_ARG(pSelf);
-    PJ_UNUSED_ARG(pArgs);
-    pjsua_vid_preview_stop(-1);
-    Py_RETURN_TRUE;
-}
-
-static PyObject *py_pj_vid_dev_count(PyObject *pSelf, PyObject *pArgs) 
-{
-    PJ_UNUSED_ARG(pSelf);
-    PJ_UNUSED_ARG(pArgs);
-    return Py_BuildValue("I", pjsua_vid_dev_count());
-}
-
-static PyObject *py_pj_vid_dev_get_info(PyObject *pSelf, PyObject *pArgs) 
-{
-    unsigned int video_device = 0;
-    pj_status_t status;
-    PyObj_pjmedia_vid_dev_info * obj;
-    pjmedia_vid_dev_info device;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if(!PyArg_ParseTuple(pArgs, "I", &video_device)) {
-        return NULL;
-    }
-
-    status = pjsua_vid_dev_get_info(-1, &device); //TODO check status
-    if (status != PJ_SUCCESS) {
-	    return NULL;
-    }    
-
-    obj = (PyObj_pjmedia_vid_dev_info *) pjmedia_vid_dev_info_new(&PyTyp_pjmedia_vid_dev_info, NULL, NULL);
-    obj->name =  PyString_FromString(device.name);
-    obj->driver = PyString_FromString(device.driver);
-    obj->caps = device.caps;
-    obj->fmt_cnt = device.fmt_cnt;
-    obj->id = device.id;
-    obj->has_callback = device.has_callback;
-    obj->dir = device.dir;
-    
-    return (PyObject *)obj;
-}
-
-
-static PyObject *py_pj_vid_enum_devs(PyObject *pSelf, PyObject *pArgs)
-{        
-    pj_status_t status;
-    PyObject *ret;
-    pjmedia_vid_dev_info info[pjsua_vid_dev_count()];
-    unsigned count, i;
-    
-    PJ_UNUSED_ARG(pSelf);
-    PJ_UNUSED_ARG(pArgs);
-    
-    count = PJ_ARRAY_SIZE(info);
-    status = pjsua_vid_enum_devs(info, &count);
-    if (status != PJ_SUCCESS) {
-	    count = 0; 
-    }
-    
-    ret = PyList_New(count);
-    for (i = 0; i < count; i++)  {
-        PyObj_pjmedia_vid_dev_info *obj;
-        obj = (PyObj_pjmedia_vid_dev_info *) pjmedia_vid_dev_info_new(&PyTyp_pjmedia_vid_dev_info, NULL, NULL);
-        obj->name = PyString_FromString(info[i].name);
-        obj->driver = PyString_FromString(info[i].driver);
-        obj->caps = info[i].caps;
-        obj->fmt_cnt = info[i].fmt_cnt;
-        obj->id = info[i].id;
-        obj->has_callback = info[i].has_callback;
-        obj->dir = info[i].dir;
-        PyList_SetItem(ret, i, (PyObject *)obj);
-    }
-    
-    return (PyObject*)ret;
-}
-
-
-static PyObject *py_pj_vid_enum_codecs(PyObject *pSelf, PyObject *pArgs)
-{
-    pj_status_t status;
-    PyObject *ret;
-    pjsua_codec_info info[PJMEDIA_CODEC_MGR_MAX_CODECS];
-    unsigned count, i;
-
-    PJ_UNUSED_ARG(pSelf);
-    PJ_UNUSED_ARG(pArgs);
-
-    count = PJ_ARRAY_SIZE(info);
-    status = pjsua_vid_enum_codecs(info, &count);
-    if (status != PJ_SUCCESS)
-	count = 0;
-    
-    ret = PyList_New(count);
-    for (i = 0; i < count; i++)  {
-        PyObj_pjsua_codec_info * obj;
-        obj = (PyObj_pjsua_codec_info *)
-	      codec_info_new(&PyTyp_pjsua_codec_info, NULL, NULL);
-        obj->codec_id = PyString_FromPJ(&info[i].codec_id);
-        obj->priority = info[i].priority;
-
-        PyList_SetItem(ret, i, (PyObject *)obj);
-    }
-
-    return (PyObject*)ret;
-}
-static PyObject *py_pj_vid_preview_has_native(PyObject *pSelf, PyObject *pArgs)
-{
-    unsigned int video_device = 0;
-    pj_bool_t result;
-    PJ_UNUSED_ARG(pSelf);
-
-    if(!PyArg_ParseTuple(pArgs, "I", &video_device)) {
-        return NULL;
-    }
-    result = pjsua_vid_preview_has_native(video_device); 	
-    if (result == PJ_TRUE)
-        Py_RETURN_TRUE;
-    else 
-        Py_RETURN_FALSE;
-}
-
-static PyObject *py_pj_vid_codec_set_priority(PyObject *pSelf, PyObject *pArgs)
-{    	
-    int status;	
-    PyObject *pCodecId;
-    pj_str_t codec_id;
-    int priority;
-    
-    PJ_UNUSED_ARG(pSelf);
-
-    if (!PyArg_ParseTuple(pArgs, "Oi", &pCodecId, &priority)) {
-        return NULL;
-    }
-
-    codec_id = PyString_ToPJ(pCodecId);
-    if (priority < 0)
-	priority = 0;
-    if (priority > 255)
-	priority = 255;
-
-    status = pjsua_vid_codec_set_priority(&codec_id, (pj_uint8_t)priority);
-    
-    return Py_BuildValue("i", status);
-}
-
-static PyObject *py_pj_vid_codec_get_param(PyObject *pSelf, PyObject *pArgs)
-{   	
-    int status;	
-    PyObject *pCodecId;
-    pj_str_t codec_id;
-    pjmedia_vid_codec_param param;
-    PyObj_pjmedia_vid_codec_param *ret;
-    
-    PJ_UNUSED_ARG(pSelf);
-
-    if (!PyArg_ParseTuple(pArgs, "O", &pCodecId)) {
-        return NULL;
-    }	
-
-    codec_id = PyString_ToPJ(pCodecId);
-
-    status = pjsua_vid_codec_get_param(&codec_id, &param);
-    if (status != PJ_SUCCESS)
-	return Py_BuildValue("");
-
-    ret = NULL;
-    ret = (PyObj_pjmedia_vid_codec_param *)
-	  pjmedia_vid_codec_param_new(&PyTyp_pjmedia_vid_codec_param, NULL, NULL);
-
-    ret->enc_fmt->id = param.enc_fmt.id;
-    ret->enc_fmt->vid->size->w = param.enc_fmt.det.vid.size.w;
-    ret->enc_fmt->vid->size->h = param.enc_fmt.det.vid.size.h;
-    ret->enc_fmt->vid->fps->num = param.enc_fmt.det.vid.fps.num;
-    ret->enc_fmt->vid->fps->denum = param.enc_fmt.det.vid.fps.denum;
-    ret->enc_fmt->vid->avg_bps = param.enc_fmt.det.vid.avg_bps;
-    ret->enc_fmt->vid->max_bps = param.enc_fmt.det.vid.max_bps;
-    ret->enc_fmtp->cnt = param.enc_fmtp.cnt;
-    //TODO FILL PYLIST param in enc_fmtp and dec_fmtp
-    ret->enc_mtu = param.enc_mtu;
-    ret->dec_fmt->id = param.enc_fmt.id;
-    ret->dec_fmt->vid->size->w = param.dec_fmt.det.vid.size.w;
-    ret->dec_fmt->vid->size->h = param.dec_fmt.det.vid.size.h;
-    ret->dec_fmt->vid->fps->num = param.dec_fmt.det.vid.fps.num;
-    ret->dec_fmt->vid->fps->denum = param.dec_fmt.det.vid.fps.denum;
-    ret->dec_fmt->vid->avg_bps = param.dec_fmt.det.vid.avg_bps;
-    ret->dec_fmt->vid->max_bps = param.dec_fmt.det.vid.max_bps;
-
-    return (PyObject*)ret;
-}
-
-static PyObject *py_pj_vid_codec_set_param(PyObject *pSelf, PyObject *pArgs)
-{    
-    /*	
-    int status;	
-    PyObject *pCodecId, *pCodecParam;
-    pj_str_t codec_id;
-    pjmedia_codec_param param;
-    
-    PJ_UNUSED_ARG(pSelf);
-
-    if (!PyArg_ParseTuple(pArgs, "OO", &pCodecId, &pCodecParam)) {
-        return NULL;
-    }	
-
-    codec_id = PyString_ToPJ(pCodecId);
-
-    if (pCodecParam != Py_None) {
-	PyObj_pjmedia_codec_param *obj;
-
-        obj = (PyObj_pjmedia_codec_param *)pCodecParam;
-
-        param.info.avg_bps = obj->info->avg_bps;
-        param.info.channel_cnt = obj->info->channel_cnt;
-        param.info.clock_rate = obj->info->clock_rate;
-        param.info.frm_ptime = obj->info->frm_ptime;
-        param.info.pcm_bits_per_sample = obj->info->pcm_bits_per_sample;
-        param.info.pt = obj->info->pt;
-        param.setting.cng = obj->setting->cng;
-        //param.setting.dec_fmtp_mode = obj->setting->dec_fmtp_mode;
-        //param.setting.enc_fmtp_mode = obj->setting->enc_fmtp_mode;
-        param.setting.frm_per_pkt = obj->setting->frm_per_pkt;
-        param.setting.penh = obj->setting->penh;
-        param.setting.plc = obj->setting->plc;
-        param.setting.vad = obj->setting->vad;
-        status = pjsua_codec_set_param(&codec_id, &param);
-
-    } else {
-        status = pjsua_codec_set_param(&codec_id, NULL);
-    }
-
-    return Py_BuildValue("i", status);
-    */
-    return NULL;
-}
-
-static PyObject *py_pj_vid_preview_get_win(PyObject *pSelf, PyObject *pArgs)
-{
-    pjsua_vid_win_id wid;
-    pjmedia_vid_dev_index deviceId;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if (!PyArg_ParseTuple(pArgs, "i", &deviceId)) {
-        return NULL;
-    }	
-
-    wid = pjsua_vid_preview_get_win(deviceId);
-    return Py_BuildValue("i", wid); 
-}
-
-static PyObject *py_pj_vid_enum_wins(PyObject *pSelf, PyObject *pArgs)
-{
-    pjsua_vid_win_id wids[PJSUA_MAX_VID_WINS];
-    unsigned i, cnt = PJ_ARRAY_SIZE(wids);
-    PyObject *ret;
-    pj_status_t status;
-
-    status = pjsua_vid_enum_wins(wids, &cnt);
-    if (status != PJ_SUCCESS)
-	return Py_BuildValue("i", status); 
-
-    ret = PyList_New(cnt);
-    for (i = 0; i < cnt; i++)  {
-        PyList_SetItem(ret, i, Py_BuildValue("i", wids[i]));
-    }
-    return (PyObject*)ret;
-}
-
-static PyObject *py_pj_vid_win_get_info(PyObject *pSelf, PyObject *pArgs)
-{
-    pjsua_vid_win_id wid;
-    pj_status_t status;
-    PyObj_pjmedia_vid_win_info * obj;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if(!PyArg_ParseTuple(pArgs, "i", &wid)) {
-        return NULL;
-    }
-    pjsua_vid_win_info wi;
-    status =  pjsua_vid_win_get_info(wid, &wi); 
-    if (status != PJ_SUCCESS)
-	return Py_BuildValue("i", status); 
-    
-    obj = (PyObj_pjmedia_vid_win_info *) pjmedia_vid_win_info_new(&PyTyp_pjmedia_vid_win_info, NULL, NULL);
-    obj->is_native =  wi.is_native;
-    obj->show = wi.show;
-    obj->size_w = wi.size.w;
-    obj->size_h = wi.size.h;
-    obj->coord_x = wi.pos.x;
-    obj->coord_y = wi.pos.y;
-    obj->rdr_dev = wi.rdr_dev;
-    obj->win = (Window)wi.hwnd.info.x11.window; //TODO Could we make this platform independant using ifdefs? 
-    //TODO check if window correct!
-    return (PyObject *)obj;
-}
-
-static PyObject *py_pj_vid_win_set_show(PyObject *pSelf, PyObject *pArgs)
-{
-    pjsua_vid_win_id wid;
-    pj_bool_t show;
-    pj_status_t status;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if(!PyArg_ParseTuple(pArgs, "ii", &wid, &show)) {
-        return NULL;
-    }
-
-    status = pjsua_vid_win_set_show(wid, show);
-
-    return Py_BuildValue("i", status);  
-}
-
-static PyObject *py_pj_vid_win_set_pos(PyObject *pSelf, PyObject *pArgs)
-{
-    pjsua_vid_win_id wid;
-    int pos_x, pos_y;
-    pj_status_t status;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if(!PyArg_ParseTuple(pArgs, "iii", &wid, &pos_x, &pos_y)) {
-        return NULL;
-    }
-
-    const pjmedia_coord pos = {pos_x, pos_y}; 
-    status = pjsua_vid_win_set_pos(wid, &pos);
-    
-    return Py_BuildValue("i", status);    	
-}
-
-static PyObject *py_pj_vid_win_set_size(PyObject *pSelf, PyObject *pArgs)
-{
-    pjsua_vid_win_id wid;
-    int size_x, size_y;
-    pj_status_t status;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if(!PyArg_ParseTuple(pArgs, "iII", &wid, &size_x, &size_y)) {
-        return NULL;
-    }
-
-    const pjmedia_rect_size size = {size_x, size_y};
-    status = pjsua_vid_win_set_size(wid, &size);
-    
-    return Py_BuildValue("i", status);    
-}
-
-static PyObject *py_pj_vid_win_rotate(PyObject *pSelf, PyObject *pArgs)
-{
-    pjsua_vid_win_id wid;
-    int angle;
-    pj_status_t status;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if(!PyArg_ParseTuple(pArgs, "ii", &wid, &angle)) {
-        return NULL;
-    }
-
-    pjsua_vid_win_info wi;
-    pjsua_vid_win_get_info(wid,&wi);
-
-    status = pjsua_vid_win_rotate (wid, angle);
-    
-    return Py_BuildValue("i", status);
-}
-
-static char py_pj_vid_dev_count_doc[] =
-    "int _pjsua.vid_dev_count()"
-    "Get the number of video devices installed in the system.";
-
-static char py_pj_vid_dev_get_info_doc[] =
-    "VideoDeviceInfo _pjsua.vid_dev_get_info(int videoDeviceid)"
-    "Retrieve the video device info for the specified device index.";
-
-static char py_pj_vid_enum_devs_doc[] =
-    "_pjsua.VideoDeviceInfo[] _pjsua.vid_enum_devs()" 
-    "Enum all supported video codecs in the system.";
-
-static char py_pj_vid_enum_codecs_doc[] =
-    "_pjsua.Codec_Info[] _pjsua.enum_codecs ()" 
-    "Enum all video devices installed in the system.";
-
-static char py_pj_vid_preview_has_native_doc[] =
-    "boolean _pjsua.vid_preview_has_native(int videoDeviceId)"
-    "Determine if the specified video input device has built-in native preview capability. This is a convenience function that is equal to querying device's capability for PJMEDIA_VID_DEV_CAP_INPUT_PREVIEW capability.";
-
-static char py_pj_vid_preview_start_doc[] =
-    "int _pjsua.vid_preview_start(int videoDeviceId, const pjsua_vid_preview_param *p)"
-    "Start video preview window for the specified capture device.";
-
-static char py_pj_vid_preview_stop_doc[] =
-    "int _pjsua.vid_preview_stop(int videoDeviceId)"
-    "Stop video preview.";
-
-static char py_pj_vid_codec_set_priority_doc[] =
-    "Change video codec priority."
-    "Codec ID, which is a string that uniquely identify the codec (such as 'H263/90000'). Please see pjsua manual or pjmedia codec reference for details."
-    "Codec priority, 0-255, where zero means to disable the codec.";
-
-static char py_pj_vid_codec_get_param_doc[] =
-    "VideoCodecParam _pjsua.vid_codec_get_param(string codec)"
-    "Get video codec parameters."
-    "Codec ID, which is a string that uniquely identify the codec (such as 'H263/90000'). Please see pjsua manual or pjmedia codec reference for details.";
-
-static char py_pj_vid_codec_set_param_doc[] =
-    "int _pjsua.vid_codec_set_param(string codec, VideoCodecParam param)" 
-    "Set video codec parameters."
-    "Codec ID, which is a string that uniquely identify the codec (such as 'H263/90000'). Please see pjsua manual or pjmedia codec reference for details."
-    "Codec parameter to set. Set to NULL to reset codec parameter to library default settings.";
-
-static char py_pj_vid_preview_get_win_doc[] =
-    "int _pjsua.vid_preview_get_win(int videoDeviceId)"
-    "Get the preview window handle associated with the capture device, if any.";
-
-static char py_pj_vid_enum_wins_doc[] =
-    "_pjsua.pjsua_vid_win_id[] _pjsu.vid_enum_wins()" 
-    "Enumerates all video windows.";
-
-static char py_pj_vid_win_get_info_doc[] =
-    "VideoWinInfo _pjsua.vid_win_get_info(int VideoWinId)"
-    "Get window info.";
-
-static char py_pj_vid_win_set_show_doc[] =
-    "int _pjsua.vid_win_set_show(int videoWindowId, boolean show)"
-    "Show or hide window. This operation is not valid for native windows (pjsua_vid_win_info.is_native=PJ_TRUE), on which native windowing API must be used instead.";
-
-static char py_pj_vid_win_set_pos_doc[] =
-    "int _pjsua.vid_wind_set_pos(int videoWindowId, int x, int y)"
-    "Set video window position. This operation is not valid for native windows (pjsua_vid_win_info.is_native=PJ_TRUE), on which native windowing API must be used instead.";
-
-static char py_pj_vid_win_set_size_doc[] =
-    "int _pjsua.vid_win_set_size(int videoWindowId, int height, int width)" 
-    "Resize window. This operation is not valid for native windows (pjsua_vid_win_info.is_native=PJ_TRUE), on which native windowing API must be used instead.";
-
-static char py_pj_vid_win_rotate_doc[] =
-    "Rotate the video window. This function will change the video orientation and also possibly the video window size (width and height get swapped). This operation is not valid for native windows (pjsua_vid_win_info.is_native =PJ_TRUE), on which native windowing API must be used instead."
-    "The rotation angle in degrees, must be multiple of 90. Specify positive value for clockwise rotation or negative value for counter-clockwise rotation.";
-
-
-
 /* END OF LIB MEDIA */
 
 /* LIB CALL */
@@ -3745,7 +3254,7 @@ static PyObject* py_pjsua_call_get_info(PyObject *pSelf, PyObject *pArgs)
     ret->state = info.state;
     Py_XDECREF(ret->state_text);
     ret->state_text = PyString_FromPJ(&info.state_text);
-    ret->vid_cnt = info.rem_vid_cnt;
+
     return (PyObject*)ret;
 }
 
@@ -3838,7 +3347,8 @@ static PyObject *py_pjsua_call_answer(PyObject *pSelf, PyObject *pArgs)
         translate_hdr(pool, &msg_data.hdr_list, omd->hdr_list);
     }
     
-    status = pjsua_call_answer(call_id, code, reason, &msg_data);
+    status = pjsua_call_answer(call_id, code, reason, &msg_data);	
+
     if (pool)
 	pj_pool_release(pool);
 
@@ -3963,72 +3473,6 @@ static PyObject *py_pjsua_call_reinvite(PyObject *pSelf, PyObject *pArgs)
         pj_pool_release(pool);
 
     return Py_BuildValue("i", status);
-}
-
-static PyObject *py_pjsua_call_reinvite_with_video(PyObject *pSelf, PyObject *pArgs)
-{    
-    //TODO Looks like copy-pase; could it be merged with call_reinvite? Using an additional parameter (video:boolean with default false)
-    int call_id;
-    int unhold;
-    int status;
-    pjsua_msg_data msg_data;
-    PyObject *omdObj;
-    pj_pool_t *pool = NULL;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if (!PyArg_ParseTuple(pArgs, "iiO", &call_id, &unhold, &omdObj)) {
-        return NULL;
-    }
-
-    pjsua_msg_data_init(&msg_data);
-    if (omdObj != Py_None) {
-	    PyObj_pjsua_msg_data *omd;
-
-        omd = (PyObj_pjsua_msg_data *)omdObj;
-        msg_data.content_type = PyString_ToPJ(omd->content_type);
-        msg_data.msg_body = PyString_ToPJ(omd->msg_body);
-        pool = pjsua_pool_create("pytmp", POOL_SIZE, POOL_SIZE);
-        translate_hdr(pool, &msg_data.hdr_list, omd->hdr_list);
-    }
-
-    //status = pjsua_call_reinvite(call_id, unhold, &msg_data);
-    pjsua_call_setting call_setting;
-
-    pjsua_call_setting_default(&call_setting);
-    call_setting.vid_cnt = 1;
-
-    status = pjsua_call_reinvite2(call_id, &call_setting, NULL);
-
-    if (pool)
-        pj_pool_release(pool);
-
-    return Py_BuildValue("i", status);
-}
-
-static PyObject *py_pjsua_call_get_vid_stream_idx(PyObject *pSelf, PyObject *pArgs) 
-{
-    int status;
-    int call_id;
-    int vid_idx;
-    pjsua_vid_win_id win_id;
-
-    PJ_UNUSED_ARG(pSelf);
-
-    if (!PyArg_ParseTuple(pArgs, "i", &call_id)) {
-        return NULL;
-    }
-
-    vid_idx = pjsua_call_get_vid_stream_idx(call_id);
-    if (vid_idx >= 0) {
-       pjsua_call_info ci;
-
-       pjsua_call_get_info(call_id, &ci);
-       win_id = ci.media[vid_idx].stream.vid.win_in;
-       return Py_BuildValue("k", win_id);
-    }
-    printf("No video found in stream!\n"); //TODO Make useful error! or none.
-    return Py_BuildValue("i", 1); //TODO Check should fail isn't?
 }
 
 /*
@@ -4274,34 +3718,6 @@ static PyObject *py_pjsua_call_send_im(PyObject *pSelf, PyObject *pArgs)
         pj_pool_release(pool);
 
     return Py_BuildValue("i", status);
-}
-
-/*
- * py_pjsua_call_get_vid_win
- */
-static PyObject *py_pjsua_call_get_vid_win(PyObject *pSelf, PyObject *pArgs)
-{    
-    int call_id;
-    int vid_idx;
-    pjsua_vid_win_id wid;
-    pjsua_vid_win_info wi;
-
-    PJ_UNUSED_ARG(pSelf);
-    if (!PyArg_ParseTuple(pArgs, "i", &call_id)) {
-        return NULL;
-    }
-
-    vid_idx = pjsua_call_get_vid_stream_idx(call_id);
-    if (vid_idx >= 0) {
-        pjsua_call_info ci;
-        pjsua_call_get_info(call_id, &ci);
-        wid = ci.media[vid_idx].stream.vid.win_in;
-        pjsua_vid_win_get_info(wid, &wi);
-        Window w = (Window)wi.hwnd.info.x11.window;
-        return Py_BuildValue("k", w);
-    }
-    //TODO Check that behavior is similar to py_pjsua_call_get_vid_stream_idx
-    return NULL;
 }
 
 /*
@@ -4961,14 +4377,6 @@ static PyMethodDef py_pjsua_methods[] =
         pjsua_call_reinvite_doc
     },
     {
-        "call_reinvite_with_video", py_pjsua_call_reinvite_with_video, METH_VARARGS,
-        pjsua_call_reinvite_doc
-    },
-    {
-        "call_get_vid_stream_idx", py_pjsua_call_get_vid_stream_idx, METH_VARARGS,
-        pjsua_call_reinvite_doc
-    },
-    {
         "call_update", py_pjsua_call_update, METH_VARARGS,
         "Send UPDATE"
     },
@@ -4989,10 +4397,6 @@ static PyMethodDef py_pjsua_methods[] =
         pjsua_call_send_im_doc
     },
     {
-        "call_get_vid_win", py_pjsua_call_get_vid_win, METH_VARARGS,
-        "Return the remote video window (the first stream)"
-    },
-    {
         "call_send_typing_ind", py_pjsua_call_send_typing_ind, METH_VARARGS,
         pjsua_call_send_typing_ind_doc
     },
@@ -5008,91 +4412,17 @@ static PyMethodDef py_pjsua_methods[] =
         "call_send_request", py_pjsua_call_send_request, METH_VARARGS,
         "Send arbitrary request"
     },
+    {
+	"dump", py_pjsua_dump, METH_VARARGS, "Dump application state"
+    },
+    {
+	"strerror", py_pj_strerror, METH_VARARGS, "Get error message"
+    },
+    {
+	"parse_simple_uri", py_pj_parse_simple_sip, METH_VARARGS, "Parse URI"
+    },
+
     
-    /* DEBUG STUFF*/
-    {
-	    "dump", py_pjsua_dump, METH_VARARGS, "Dump application state"
-    },
-    {
-	    "strerror", py_pj_strerror, METH_VARARGS, "Get error message"
-    },
-    {
-	    "parse_simple_uri", py_pj_parse_simple_sip, METH_VARARGS, "Parse URI"
-    },
-    /* END OF DEBUG STUFF*/
-    
-    /* Video-API */
-    //TODO Check all methods return int status, if boolean and exception would fit better.
-    //TODO Check if int VideoDeviceId could be replaced by VideoDeviceInfo
-    {
-        "vid_dev_count", py_pj_vid_dev_count, METH_VARARGS, 
-        py_pj_vid_dev_count_doc
-    },
-    {
-        "vid_dev_get_info", py_pj_vid_dev_get_info, METH_VARARGS, 
-        py_pj_vid_dev_get_info_doc
-    },
-    {
-        "vid_enum_devs", py_pj_vid_enum_devs, METH_VARARGS, 
-        py_pj_vid_enum_devs_doc
-    },
-    {
-        "vid_preview_has_native", py_pj_vid_preview_has_native, METH_VARARGS, 
-        py_pj_vid_preview_has_native_doc
-    },
-    {
-        "vid_preview_start", py_pj_vid_preview_start, METH_VARARGS, 
-        py_pj_vid_preview_start_doc
-    },
-    {   
-        "vid_preview_stop", py_pj_vid_preview_stop, METH_VARARGS, 
-        py_pj_vid_preview_stop_doc
-    },
-    {
-        "vid_preview_get_win", py_pj_vid_preview_get_win, METH_VARARGS, 
-        py_pj_vid_preview_get_win_doc
-    },     
-    {
-        "vid_enum_wins", py_pj_vid_enum_wins, METH_VARARGS, 
-        py_pj_vid_enum_wins_doc
-    },
-    {
-        "vid_win_get_info", py_pj_vid_win_get_info, METH_VARARGS, 
-        py_pj_vid_win_get_info_doc
-    },
-    {
-        "vid_win_set_show", py_pj_vid_win_set_show, METH_VARARGS, 
-        py_pj_vid_win_set_show_doc
-    },
-    {
-        "vid_win_set_pos", py_pj_vid_win_set_pos, METH_VARARGS, 
-        py_pj_vid_win_set_pos_doc
-    },
-    {
-        "vid_win_set_size", py_pj_vid_win_set_size, METH_VARARGS, 
-        py_pj_vid_win_set_size_doc
-    },
-    {
-        "vid_win_rotate", py_pj_vid_win_rotate, METH_VARARGS, 
-        py_pj_vid_win_rotate_doc
-    },
-    {
-        "vid_enum_codecs", py_pj_vid_enum_codecs, METH_VARARGS, 
-        py_pj_vid_enum_codecs_doc
-    },
-    {
-        "vid_codec_set_priority", py_pj_vid_codec_set_priority, METH_VARARGS, 
-        py_pj_vid_codec_set_priority_doc
-    },
-    {
-        "vid_codec_get_param", py_pj_vid_codec_get_param, METH_VARARGS, 
-        py_pj_vid_codec_get_param_doc
-    },
-    {
-        "vid_codec_set_param", py_pj_vid_codec_set_param, METH_VARARGS, 
-        py_pj_vid_codec_set_param_doc
-    },
-    /* END OF Video-API */
     {NULL, NULL} /* end of function list */
 };
 
@@ -5176,27 +4506,6 @@ init_pjsua(void)
         return;
 
     if (PyType_Ready(&PyTyp_pjmedia_codec_param) < 0)
-        return;
-
-    if (PyType_Ready(&PyTyp_pjmedia_vid_dev_info) < 0)
-        return;
-
-     if (PyType_Ready(&PyTyp_pjmedia_vid_win_info) < 0)
-        return;
-
-     if (PyType_Ready(&PyTyp_pjmedia_rect_size) < 0)
-        return;
-
-     if (PyType_Ready(&PyTyp_pjmedia_ratio) < 0)
-        return;
-
-     if (PyType_Ready(&PyTyp_pjmedia_codec_fmtp_param) < 0)
-        return;
-
-     if (PyType_Ready(&PyTyp_pjmedia_codec_fmtp) < 0)
-        return;
-
-     if (PyType_Ready(&PyTyp_pjmedia_vid_codec_param) < 0)
         return;
 
     /* END OF LIB MEDIA */
@@ -5286,29 +4595,6 @@ init_pjsua(void)
     Py_INCREF(&PyTyp_pjmedia_codec_param);
     PyModule_AddObject(m, "PJMedia_Codec_Param", 
 	(PyObject *)&PyTyp_pjmedia_codec_param);
-    Py_INCREF(&PyTyp_pjmedia_vid_dev_info);
-    PyModule_AddObject(m, "PJMedia_Vid_Dev_Info", 
-	(PyObject *)&PyTyp_pjmedia_vid_dev_info);
-    Py_INCREF(&PyTyp_pjmedia_vid_win_info);
-    PyModule_AddObject(m, "PJMedia_Vid_Win_Info", 
-	(PyObject *)&PyTyp_pjmedia_vid_win_info);
-    Py_INCREF(&PyTyp_pjmedia_rect_size);
-    PyModule_AddObject(m, "PJMedia_Rect_Size", 
-	(PyObject *)&PyTyp_pjmedia_rect_size);
-    Py_INCREF(&PyTyp_pjmedia_ratio);
-    PyModule_AddObject(m, "PJMedia_Ratio", 
-	(PyObject *)&PyTyp_pjmedia_ratio);
-    Py_INCREF(&PyTyp_pjmedia_codec_fmtp_param);
-    PyModule_AddObject(m, "PJMedia_Codec_Fmtp_Param", 
-	(PyObject *)&PyTyp_pjmedia_codec_fmtp_param);
-    Py_INCREF(&PyTyp_pjmedia_codec_fmtp);
-    PyModule_AddObject(m, "PJMedia_Codec_Fmtp", 
-	(PyObject *)&PyTyp_pjmedia_codec_fmtp);
-    Py_INCREF(&PyTyp_pjmedia_vid_codec_param);
-    PyModule_AddObject(m, "PJMedia_Vid_Codec_Param", 
-	(PyObject *)&PyTyp_pjmedia_vid_codec_param);
-
-
 
     /* END OF LIB MEDIA */
 
