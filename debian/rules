@@ -18,6 +18,8 @@ ifeq ($(shell dpkg-architecture -qDEB_HOST_ARCH), amd64)
 endif
 
 #Configure PJSip options
+override_dh_auto_clean:
+
 override_dh_auto_configure:
 	#./configure is buggy as parameters are not handed over to ./aconfigure, which is the new configure-script ("") is missing.
 	dh_auto_configure -- CFLAGS=$(CFLAGS) CXXFLAGS=$(CXXFLAGS)
