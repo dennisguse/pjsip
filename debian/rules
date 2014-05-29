@@ -28,7 +28,7 @@ override_dh_auto_build:
 	dh_auto_build --
 
 	echo "Building language bindings for PJSUA2 using -swig."
-	cd pjsip-apps/src/swig && make
+	cd pjsip-apps/src/swig && make DIRS=python
 
 	echo "Building pjsip/samples/vidgui"
 	cd pjsip-apps/src/vidgui && make -f pj-pkgconfig.mak && qmake-qt4 && make
